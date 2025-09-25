@@ -1,7 +1,7 @@
 import { PredictionResult, ApiError } from '@/types';
 
-const API_URL = process.env.VITE_MODEL_API_URL || '';
-const API_KEY = process.env.VITE_API_KEY || '';
+const API_URL = import.meta.env.VITE_MODEL_API_URL || '';
+const API_KEY = import.meta.env.VITE_API_KEY || '';
 const DEMO_MODE = !API_URL;
 
 // Demo data for testing
