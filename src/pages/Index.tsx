@@ -6,8 +6,9 @@ import { ImagePicker } from '@/components/ImagePicker';
 import { ResultCard } from '@/components/ResultCard';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { HelpDialog } from '@/components/HelpDialog';
-import { PredictionResult, ProcessingState } from '@/types';
-import { predictDisease, isDemoMode } from '@/utils/apiUtils';
+import { AdvicePanel } from '@/components/AdvicePanel';
+import { PredictionResult, AdviceResponse, ProcessingState } from '@/types';
+import { predictDisease, getAdvice, isDemoMode } from '@/utils/apiUtils';
 import durianLeafLogo from '@/assets/durian-leaf-logo.png';
 
 const Index = () => {
@@ -15,6 +16,8 @@ const Index = () => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [processingState, setProcessingState] = useState<ProcessingState>('idle');
   const [result, setResult] = useState<PredictionResult | null>(null);
+  const [advice, setAdvice] = useState<AdviceResponse | null>(null);
+  const [adviceLoading, setAdviceLoading] = useState(false);
   const { toast } = useToast();
 
   const handleImageSelect = (base64: string, file: File) => {
@@ -27,6 +30,7 @@ const Index = () => {
     setSelectedImage(null);
     setSelectedFile(null);
     setResult(null);
+    setAdvice(null);
     setProcessingState('idle');
   };
 
@@ -34,6 +38,7 @@ const Index = () => {
     if (!selectedImage) return;
 
     setProcessingState('processing');
+    setAdvice(null);
     
     try {
       const prediction = await predictDisease(selectedImage);
@@ -44,6 +49,22 @@ const Index = () => {
         title: "วิเคราะห์สำเร็จ",
         description: "ได้ผลการวินิจฉัยแล้ว",
       });
+
+      // Automatically fetch advice after successful diagnosis
+      try {
+        setAdviceLoading(true);
+        const adviceResult = await getAdvice(prediction.label, prediction.probs);
+        setAdvice(adviceResult);
+      } catch (adviceError: any) {
+        console.error('Advice fetch failed:', adviceError);
+        toast({
+          title: "ไม่สามารถโหลดคำแนะนำได้",
+          description: "แต่สามารถดูผลการวินิจฉัยได้",
+          variant: "destructive"
+        });
+      } finally {
+        setAdviceLoading(false);
+      }
       
     } catch (error: any) {
       setProcessingState('error');
@@ -52,6 +73,28 @@ const Index = () => {
         description: error.message || "ไม่สามารถวิเคราะห์ภาพได้",
         variant: "destructive"
       });
+    }
+  };
+
+  const handleRequestMoreAdvice = async (question: string) => {
+    if (!result) return;
+
+    setAdviceLoading(true);
+    try {
+      const adviceResult = await getAdvice(result.label, result.probs, question);
+      setAdvice(adviceResult);
+      toast({
+        title: "ได้คำแนะนำใหม่แล้ว",
+        description: "อ่านคำแนะนำด้านล่าง",
+      });
+    } catch (error: any) {
+      toast({
+        title: "เกิดข้อผิดพลาด",
+        description: error.message || "ไม่สามารถขอคำแนะนำได้",
+        variant: "destructive"
+      });
+    } finally {
+      setAdviceLoading(false);
     }
   };
 
@@ -141,10 +184,29 @@ const Index = () => {
             )}
             
             {processingState === 'success' && result && (
-              <ResultCard 
-                result={result}
-                onDownloadReport={handleDownloadReport}
-              />
+              <>
+                <ResultCard 
+                  result={result}
+                  onDownloadReport={handleDownloadReport}
+                />
+                
+                {adviceLoading && (
+                  <div className="flex items-center justify-center p-8 bg-accent/5 rounded-lg border border-accent/20">
+                    <div className="text-center">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent mx-auto mb-3"></div>
+                      <p className="text-sm text-muted-foreground">กำลังสร้างคำแนะนำ...</p>
+                    </div>
+                  </div>
+                )}
+                
+                {!adviceLoading && advice && (
+                  <AdvicePanel 
+                    advice={advice}
+                    onRequestMore={handleRequestMoreAdvice}
+                    isLoading={adviceLoading}
+                  />
+                )}
+              </>
             )}
             
             {processingState === 'idle' && !selectedImage && (

@@ -5,6 +5,12 @@ export interface PredictionResult {
   model_version: string;
 }
 
+export interface AdviceResponse {
+  title: string;
+  bullets: string[];
+  disclaimer: string;
+}
+
 export interface ApiError {
   message: string;
   code?: string;
